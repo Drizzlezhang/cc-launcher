@@ -1,0 +1,36 @@
+{
+  "name": "@drizzlezhang/cc-launcher",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Manage NewAPI config and launch Claude Code CLI",
+  "author": "Drizzlezhang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Drizzlezhang/cc-launcher.git"
+  },
+  "bin": {
+    "cc-launcher": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node ./src/index.js"
+  },
+  "keywords": [
+    "claude",
+    "cli",
+    "newapi",
+    "launcher"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "inquirer": "^9.2.0",
+    "axios": "^1.6.0",
+    "chalk": "^5.3.0",
+    "execa": "^8.0.0",
+    "conf": "^12.0.0"
+  }
+}
