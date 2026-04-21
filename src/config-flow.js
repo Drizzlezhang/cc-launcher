@@ -16,7 +16,7 @@ import {
   showConfigSaved,
 } from './banner.js';
 
-async function fetchAndSelectModel(baseurl, apikey, currentConfig) {
+async function fetchAndSelectModel(baseurl, apikey, defaultModel) {
   console.log();
   showStatus('Fetching available models...', 'loading');
 
@@ -44,7 +44,7 @@ async function fetchAndSelectModel(baseurl, apikey, currentConfig) {
       name: 'selectedModel',
       message: '🤖 Choose your default model:',
       choices: models,
-      default: currentConfig.selectedModel || models[0],
+      default: defaultModel || models[0],
       pageSize,
     },
   ]);
@@ -52,14 +52,15 @@ async function fetchAndSelectModel(baseurl, apikey, currentConfig) {
   return modelAnswer.selectedModel;
 }
 
-async function runWorkConfig(currentConfig) {
-  // 工作模式：直接配置 NewAPI
+async function runWorkConfig() {
+  const workConfig = getConfig().work || {};
+
   const answers = await inquirer.prompt([
     {
       type: 'input',
       name: 'baseurl',
       message: '🔗 Enter work API endpoint URL:',
-      default: currentConfig.baseurl || '',
+      default: workConfig.baseurl || '',
       validate: (input) => {
         if (!input.trim()) return 'Endpoint URL is required';
         try {
@@ -74,7 +75,7 @@ async function runWorkConfig(currentConfig) {
       type: 'password',
       name: 'apikey',
       message: '🔑 Enter work API key:',
-      default: currentConfig.apikey || '',
+      default: workConfig.apikey || '',
       validate: (input) => {
         if (!input.trim()) return 'API key is required';
         return true;
@@ -82,24 +83,24 @@ async function runWorkConfig(currentConfig) {
     },
   ]);
 
-  const selectedModel = await fetchAndSelectModel(answers.baseurl, answers.apikey, currentConfig);
+  const selectedModel = await fetchAndSelectModel(answers.baseurl, answers.apikey, workConfig.selectedModel);
 
   setConfig({
-    mode: 'work',
-    channel: 'newapi',
     baseurl: answers.baseurl,
     apikey: answers.apikey,
     selectedModel,
   });
 }
 
-async function runNewApiConfig(currentConfig) {
+async function runNewApiConfig() {
+  const personalConfig = getConfig().personal || {};
+
   const answers = await inquirer.prompt([
     {
       type: 'input',
       name: 'baseurl',
       message: '🔗 Enter API endpoint URL:',
-      default: currentConfig.baseurl || '',
+      default: personalConfig.baseurl || '',
       validate: (input) => {
         if (!input.trim()) return 'Endpoint URL is required';
         try {
@@ -114,7 +115,7 @@ async function runNewApiConfig(currentConfig) {
       type: 'password',
       name: 'apikey',
       message: '🔑 Enter your API key:',
-      default: currentConfig.apikey || '',
+      default: personalConfig.apikey || '',
       validate: (input) => {
         if (!input.trim()) return 'API key is required';
         return true;
@@ -122,10 +123,9 @@ async function runNewApiConfig(currentConfig) {
     },
   ]);
 
-  const selectedModel = await fetchAndSelectModel(answers.baseurl, answers.apikey, currentConfig);
+  const selectedModel = await fetchAndSelectModel(answers.baseurl, answers.apikey, personalConfig.selectedModel);
 
   setConfig({
-    mode: 'personal',
     channel: 'newapi',
     baseurl: answers.baseurl,
     apikey: answers.apikey,
@@ -133,7 +133,9 @@ async function runNewApiConfig(currentConfig) {
   });
 }
 
-async function runVertexConfig(currentConfig) {
+async function runVertexConfig() {
+  const personalConfig = getConfig().personal || {};
+
   if (!isGcloudInstalled()) {
     console.log();
     showWarning('gcloud CLI is not installed.');
@@ -193,7 +195,7 @@ async function runVertexConfig(currentConfig) {
       type: 'input',
       name: 'projectId',
       message: '📊 Enter GCP Project ID:',
-      default: currentConfig.projectId || defaultProjectId || '',
+      default: personalConfig.projectId || defaultProjectId || '',
       validate: (input) => {
         if (!input.trim()) return 'Project ID is required';
         return true;
@@ -207,7 +209,7 @@ async function runVertexConfig(currentConfig) {
         name: `${r.name} ${chalk.gray(`(${r.description})`)}`,
         value: r.id,
       })),
-      default: currentConfig.region || 'global',
+      default: personalConfig.region || 'global',
     },
     {
       type: 'list',
@@ -217,18 +219,17 @@ async function runVertexConfig(currentConfig) {
         name: `${m.name} ${chalk.gray(`(${m.context})`)}`,
         value: m.id,
       })),
-      default: currentConfig.vertexModel || 'claude-sonnet-4-6',
+      default: personalConfig.vertexModel || 'claude-sonnet-4-6',
     },
     {
       type: 'input',
       name: 'serviceAccountKeyPath',
       message: '🔐 Service Account Key path (optional, press Enter to use ADC):',
-      default: currentConfig.serviceAccountKeyPath || '',
+      default: personalConfig.serviceAccountKeyPath || '',
     },
   ]);
 
   setConfig({
-    mode: 'personal',
     channel: 'vertex',
     projectId: answers.projectId,
     region: answers.region,
@@ -240,7 +241,12 @@ async function runVertexConfig(currentConfig) {
 export async function runConfigFlow() {
   showConfigBanner();
 
-  const currentConfig = getConfig();
+  // 读取完整配置
+  const fullConfig = {
+    mode: 'personal',
+    personal: {},
+    work: {},
+  };
 
   // Step 1: 模式选择
   const modeAnswer = await inquirer.prompt([
@@ -252,17 +258,20 @@ export async function runConfigFlow() {
         { name: `Personal ${chalk.gray('(configure yourself)')}`, value: 'personal' },
         { name: `Work ${chalk.gray('(company environment)')}`, value: 'work' },
       ],
-      default: currentConfig.mode || 'personal',
+      default: 'personal',
     },
   ]);
+
+  // 先设置模式
+  setConfig({ mode: modeAnswer.mode });
 
   console.log();
 
   if (modeAnswer.mode === 'work') {
-    // 工作模式：直接配置 NewAPI
-    await runWorkConfig(currentConfig);
+    await runWorkConfig();
   } else {
-    // 个人模式：渠道选择
+    const personalConfig = getConfig().personal || {};
+
     const channelAnswer = await inquirer.prompt([
       {
         type: 'list',
@@ -272,16 +281,16 @@ export async function runConfigFlow() {
           { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
           { name: `Google Vertex AI ${chalk.gray('(GCP)')}`, value: 'vertex' },
         ],
-        default: currentConfig.channel || 'newapi',
+        default: personalConfig.channel || 'newapi',
       },
     ]);
 
     console.log();
 
     if (channelAnswer.channel === 'vertex') {
-      await runVertexConfig(currentConfig);
+      await runVertexConfig();
     } else {
-      await runNewApiConfig(currentConfig);
+      await runNewApiConfig();
     }
   }
 
