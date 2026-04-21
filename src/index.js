@@ -9,7 +9,7 @@ import { showBanner } from './banner.js';
 program
   .name('cc-launcher')
   .description('Manage API config and launch Claude Code CLI (supports NewAPI and Google Vertex AI)')
-  .version('1.1.0')
+  .version('1.2.0')
   .option('-c, --config', 'Run interactive configuration')
   .option('--clear', 'Clear saved configuration')
   .action(async (options) => {
