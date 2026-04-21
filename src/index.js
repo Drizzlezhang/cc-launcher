@@ -11,7 +11,7 @@ import { checkForUpdate, performUpdate } from './update.js';
 program
   .name('cc-launcher')
   .description('Manage API config and launch Claude Code CLI (supports NewAPI, Kimi, and Google Vertex AI)')
-  .version('1.3.0')
+  .version('1.3.1')
   .option('-c, --config', 'Run interactive configuration')
   .option('-s, --status', 'Show current configuration status')
   .option('-m, --mode <mode>', 'Switch mode (work/personal)')
