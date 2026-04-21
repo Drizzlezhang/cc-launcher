@@ -27,6 +27,7 @@ const CHANNEL_ENV_VARS = [
   'USE_VERTEX_AUTH',
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_AUTH_TOKEN',
+  'NODE_TLS_REJECT_UNAUTHORIZED',
 ];
 
 /**
@@ -74,7 +75,7 @@ function writeSettings(settings) {
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
 }
 
-function updateSettingsForNewApi(settings, { baseurl, apikey, selectedModel }) {
+function updateSettingsForNewApi(settings, { baseurl, apikey, selectedModel, mode }) {
   if (!settings.env) {
     settings.env = {};
   }
@@ -83,6 +84,12 @@ function updateSettingsForNewApi(settings, { baseurl, apikey, selectedModel }) {
   settings.env.ANTHROPIC_BASE_URL = baseurl;
   settings.env.ANTHROPIC_AUTH_TOKEN = apikey;
   settings.env.ANTHROPIC_MODEL = selectedModel;
+
+  // Work 模式下允许自签名证书
+  if (mode === 'work') {
+    settings.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  }
+
   return settings;
 }
 
@@ -217,7 +224,7 @@ export async function launchClaude() {
   } else if (channel === 'kimi') {
     updateSettingsForKimi(settings, config);
   } else {
-    updateSettingsForNewApi(settings, config);
+    updateSettingsForNewApi(settings, { ...config, mode: currentMode });
   }
 
   writeSettings(settings);
