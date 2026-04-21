@@ -65,10 +65,14 @@ export function showLaunchInfo(mode, channel, config) {
   console.log(chalk.white('  👤 Mode:      ') + modeDisplay);
 
   if (channel === 'vertex') {
-    console.log(chalk.white('  🌐 Channel:   ') + chalk.green('Google Vertex AI'));
+    console.log(chalk.white('  🌐 Channel:   ') + chalk.green('Vertex AI (Gemini)'));
     console.log(chalk.white('  📊 Project:   ') + chalk.green(config.projectId));
-    console.log(chalk.white('  🌍 Region:    ') + chalk.green(config.region));
+    console.log(chalk.white('  🔗 Proxy:     ') + chalk.green(config.proxyUrl));
     console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.vertexModel));
+  } else if (channel === 'kimi') {
+    console.log(chalk.white('  🌐 Channel:   ') + chalk.green('Kimi Coding Plan'));
+    console.log(chalk.white('  🔗 Endpoint:  ') + chalk.green('https://api.kimi.com/coding/'));
+    console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.selectedModel));
   } else {
     console.log(chalk.white('  🌐 Channel:   ') + chalk.green('NewAPI'));
     console.log(chalk.white('  🔗 Endpoint:  ') + chalk.green(config.baseurl));
@@ -134,5 +138,57 @@ export function showConfigSaved(configPath) {
   console.log();
   console.log(chalk.green('  🎉 Configuration saved successfully!'));
   console.log(chalk.gray(`  📁 ${configPath}`));
+  console.log();
+}
+
+/**
+ * 掩码敏感信息
+ */
+function maskSensitive(value, visibleChars = 4) {
+  if (!value) return chalk.gray('(not set)');
+  if (value.length <= visibleChars * 2) {
+    return '*'.repeat(value.length);
+  }
+  return value.slice(0, visibleChars) + '****' + value.slice(-visibleChars);
+}
+
+/**
+ * 显示当前配置状态
+ */
+export function showConfigStatus(config) {
+  console.log();
+  console.log(chalk.cyan.bold('  📋 Current Configuration'));
+  console.log(chalk.gray('  ─────────────────────────'));
+  console.log();
+
+  const modeDisplay = config.mode === 'work' ? chalk.yellow('Work') : chalk.blue('Personal');
+  console.log(chalk.white('  👤 Mode:      ') + modeDisplay);
+
+  if (config.mode === 'work') {
+    console.log(chalk.white('  🔗 Endpoint:  ') + chalk.green(config.baseurl || chalk.gray('(not set)')));
+    console.log(chalk.white('  🔑 API Key:   ') + maskSensitive(config.apikey));
+    console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.selectedModel || chalk.gray('(not set)')));
+  } else {
+    const channelDisplay = {
+      'newapi': 'NewAPI',
+      'kimi': 'Kimi Coding Plan',
+      'vertex': 'Vertex AI (Gemini)',
+    };
+    console.log(chalk.white('  🌐 Channel:   ') + chalk.green(channelDisplay[config.channel] || config.channel));
+
+    if (config.channel === 'vertex') {
+      console.log(chalk.white('  📊 Project:   ') + chalk.green(config.projectId || chalk.gray('(not set)')));
+      console.log(chalk.white('  🔗 Proxy:     ') + chalk.green(config.proxyUrl || chalk.gray('(not set)')));
+      console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.vertexModel || chalk.gray('(not set)')));
+    } else if (config.channel === 'kimi') {
+      console.log(chalk.white('  🔑 API Key:   ') + maskSensitive(config.kimiApikey));
+      console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.selectedModel || chalk.gray('(not set)')));
+    } else {
+      console.log(chalk.white('  🔗 Endpoint:  ') + chalk.green(config.baseurl || chalk.gray('(not set)')));
+      console.log(chalk.white('  🔑 API Key:   ') + maskSensitive(config.apikey));
+      console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.selectedModel || chalk.gray('(not set)')));
+    }
+  }
+
   console.log();
 }

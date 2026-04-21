@@ -1,5 +1,11 @@
 import axios from 'axios';
 import chalk from 'chalk';
+import https from 'https';
+
+// 创建允许自签名证书的 agent
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
 
 export async function fetchModels(baseurl, apikey) {
   try {
@@ -8,6 +14,7 @@ export async function fetchModels(baseurl, apikey) {
       headers: {
         Authorization: `Bearer ${apikey}`,
       },
+      httpsAgent: baseurl.startsWith('https://') ? httpsAgent : undefined,
       timeout: 30000,
     });
 

@@ -153,6 +153,42 @@ async function runNewApiConfig() {
   return true;
 }
 
+const KIMI_BASE_URL = 'https://api.kimi.com/coding/';
+
+async function runKimiConfig() {
+  const personalConfig = getPersonalConfig();
+
+  // 显示已保存的 key 提示
+  if (personalConfig.kimiApikey) {
+    const maskedKey = personalConfig.kimiApikey.slice(0, 4) + '****' + personalConfig.kimiApikey.slice(-4);
+    console.log(chalk.gray(`  Using saved key: ${maskedKey}`));
+  }
+
+  const { kimiApikey } = await inquirer.prompt([
+    {
+      type: 'password',
+      name: 'kimiApikey',
+      message: '🔑 Enter Kimi API key (press Enter to use saved):',
+      default: personalConfig.kimiApikey || '',
+      validate: (input) => {
+        if (!input.trim()) return 'API key is required';
+        return true;
+      },
+    },
+  ]);
+
+  const selectedModel = await fetchAndSelectModel(KIMI_BASE_URL, kimiApikey, personalConfig.selectedModel);
+  if (!selectedModel) return false;
+
+  setConfig({
+    channel: 'kimi',
+    kimiApikey,
+    selectedModel,
+  });
+
+  return true;
+}
+
 async function runVertexConfig() {
   const personalConfig = getPersonalConfig();
 
@@ -240,23 +276,32 @@ async function runVertexConfig() {
     {
       type: 'list',
       name: 'vertexModel',
-      message: '🤖 Choose Claude model:',
+      message: '🤖 Choose Gemini model:',
       choices: [...VERTEX_MODELS.map((m) => ({
-        name: `${m.name} ${chalk.gray(`(${m.context})`)}`,
+        name: `${m.name} ${chalk.gray(`(${m.context}, ${m.description})`)}`,
         value: m.id,
       })), BACK_OPTION],
-      default: personalConfig.vertexModel || 'claude-sonnet-4-6',
+      default: personalConfig.vertexModel || 'gemini-3.1-pro-preview',
     },
   ]);
 
   if (vertexModel === BACK_OPTION) return false;
 
-  const { serviceAccountKeyPath } = await inquirer.prompt([
+  const { proxyUrl } = await inquirer.prompt([
     {
       type: 'input',
-      name: 'serviceAccountKeyPath',
-      message: '🔐 Service Account Key path (optional, press Enter to use ADC):',
-      default: personalConfig.serviceAccountKeyPath || '',
+      name: 'proxyUrl',
+      message: '🔗 Proxy URL (e.g. http://localhost:8082):',
+      default: personalConfig.proxyUrl || 'http://localhost:8082',
+      validate: (input) => {
+        if (!input.trim()) return 'Proxy URL is required';
+        try {
+          new URL(input);
+          return true;
+        } catch {
+          return 'Please enter a valid URL';
+        }
+      },
     },
   ]);
 
@@ -265,7 +310,7 @@ async function runVertexConfig() {
     projectId: answers.projectId,
     region: answers.region,
     vertexModel,
-    serviceAccountKeyPath: serviceAccountKeyPath || undefined,
+    proxyUrl,
   });
 
   return true;
@@ -324,6 +369,7 @@ export async function runConfigFlow() {
           message: '🌐 Choose your API provider:',
           choices: [
             { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
+            { name: `Kimi Coding Plan`, value: 'kimi' },
             { name: `Google Vertex AI ${chalk.gray('(GCP)')}`, value: 'vertex' },
             { name: BACK_OPTION, value: 'back' },
           ],
@@ -342,6 +388,8 @@ export async function runConfigFlow() {
       let success;
       if (channel === 'vertex') {
         success = await runVertexConfig();
+      } else if (channel === 'kimi') {
+        success = await runKimiConfig();
       } else {
         success = await runNewApiConfig();
       }

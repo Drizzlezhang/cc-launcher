@@ -69,11 +69,12 @@ export function getConfig() {
       channel: personal.channel || 'newapi',
       baseurl: personal.baseurl,
       apikey: personal.apikey,
+      kimiApikey: personal.kimiApikey,
       selectedModel: personal.selectedModel,
       projectId: personal.projectId,
       region: personal.region,
       vertexModel: personal.vertexModel,
-      serviceAccountKeyPath: personal.serviceAccountKeyPath,
+      proxyUrl: personal.proxyUrl,
     };
   }
 }
@@ -111,11 +112,12 @@ export function setConfig(data) {
     if (data.channel !== undefined) personal.channel = data.channel;
     if (data.baseurl !== undefined) personal.baseurl = data.baseurl;
     if (data.apikey !== undefined) personal.apikey = data.apikey;
+    if (data.kimiApikey !== undefined) personal.kimiApikey = data.kimiApikey;
     if (data.selectedModel !== undefined) personal.selectedModel = data.selectedModel;
     if (data.projectId !== undefined) personal.projectId = data.projectId;
     if (data.region !== undefined) personal.region = data.region;
     if (data.vertexModel !== undefined) personal.vertexModel = data.vertexModel;
-    if (data.serviceAccountKeyPath !== undefined) personal.serviceAccountKeyPath = data.serviceAccountKeyPath;
+    if (data.proxyUrl !== undefined) personal.proxyUrl = data.proxyUrl;
     config.set('personal', personal);
   }
 }
@@ -143,7 +145,9 @@ export function hasPersonalConfig() {
   const channel = personal.channel || 'newapi';
 
   if (channel === 'vertex') {
-    return !!(personal.projectId && personal.region && personal.vertexModel);
+    return !!(personal.projectId && personal.vertexModel && personal.proxyUrl);
+  } else if (channel === 'kimi') {
+    return !!(personal.kimiApikey && personal.selectedModel);
   } else {
     return !!(personal.baseurl && personal.apikey && personal.selectedModel);
   }

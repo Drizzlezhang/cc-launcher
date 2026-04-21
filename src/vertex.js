@@ -1,13 +1,11 @@
 import { execSync } from 'child_process';
 import chalk from 'chalk';
 
-// Vertex AI 可用的 Claude 模型列表
+// Vertex AI 可用的 Gemini 模型列表
 export const VERTEX_MODELS = [
-  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7 (最新)', context: '1M' },
-  { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', context: '1M' },
-  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', context: '1M' },
-  { id: 'claude-sonnet-4-5@20250929', name: 'Claude Sonnet 4.5', context: '200K' },
-  { id: 'claude-haiku-4-5@20251001', name: 'Claude Haiku 4.5 (快速)', context: '200K' },
+  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', context: '1M', description: '最强推理能力' },
+  { id: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash-Lite', context: '1M', description: '最高性价比' },
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', context: '1M', description: '快速响应' },
 ];
 
 // 支持的 Region 列表
