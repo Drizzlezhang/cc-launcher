@@ -5,6 +5,7 @@ import { join } from 'path';
 import chalk from 'chalk';
 import { getConfig, hasValidConfig, getChannel } from './config.js';
 import { runConfigFlow } from './config-flow.js';
+import { showLaunchInfo, showStatus } from './banner.js';
 
 const SETTINGS_PATH = join(homedir(), '.claude', 'settings.drizzle.json');
 
@@ -16,7 +17,6 @@ function readSettings() {
     const content = readFileSync(SETTINGS_PATH, 'utf-8');
     return JSON.parse(content);
   } catch (error) {
-    console.error(chalk.yellow('Warning: Failed to parse settings file, creating new one'));
     return { env: {}, permissions: { allow: [] } };
   }
 }
@@ -67,12 +67,11 @@ function updateSettingsForVertex(settings, { projectId, region, vertexModel, ser
 export async function launchClaude() {
   // Check if config exists
   if (!hasValidConfig()) {
-    console.log(chalk.yellow('No valid configuration found. Let\'s set it up first.'));
-    console.log();
+    showStatus('No configuration found. Starting setup...', 'warning');
     await runConfigFlow();
     // After config, read the new config
     if (!hasValidConfig()) {
-      console.error(chalk.red('Configuration failed. Exiting.'));
+      showStatus('Configuration failed. Exiting.', 'error');
       process.exit(1);
     }
   }
@@ -81,29 +80,23 @@ export async function launchClaude() {
   const channel = getChannel();
 
   // Update settings.drizzle.json
-  console.log(chalk.gray('Updating Claude settings...'));
+  showStatus('Updating Claude settings...', 'saving');
+
   const settings = readSettings();
 
   if (channel === 'vertex') {
     updateSettingsForVertex(settings, config);
-    console.log(chalk.green('Settings updated successfully!'));
-    console.log(chalk.gray(`  Channel: Google Vertex AI`));
-    console.log(chalk.gray(`  Project: ${config.projectId}`));
-    console.log(chalk.gray(`  Region: ${config.region}`));
-    console.log(chalk.gray(`  Model: ${config.vertexModel}`));
   } else {
     updateSettingsForNewApi(settings, config);
-    console.log(chalk.green('Settings updated successfully!'));
-    console.log(chalk.gray(`  Channel: NewAPI`));
-    console.log(chalk.gray(`  Base URL: ${config.baseurl}`));
-    console.log(chalk.gray(`  Model: ${config.selectedModel}`));
   }
 
   writeSettings(settings);
-  console.log();
+
+  // Show launch info
+  showLaunchInfo(channel, config);
 
   // Launch claude
-  console.log(chalk.cyan('Launching Claude Code...'));
+  showStatus('Starting Claude Code...', 'launching');
   console.log();
 
   try {
@@ -113,14 +106,15 @@ export async function launchClaude() {
     });
   } catch (error) {
     if (error.code === 'ENOENT') {
-      console.error(chalk.red('Error: "claude" command not found.'));
-      console.error(chalk.yellow('Please make sure Claude Code CLI is installed globally.'));
-      console.error(chalk.gray('Install: npm install -g @anthropic-ai/claude-code'));
+      showStatus('Claude CLI not found. Please install it first:', 'error');
+      console.log(chalk.gray('  npm install -g @anthropic-ai/claude-code'));
+      console.log();
       process.exit(1);
     }
     // If the process exited with a code, that's normal (user quit)
     if (error.exitCode !== undefined && error.exitCode !== 0) {
-      console.error(chalk.red(`Claude exited with code ${error.exitCode}`));
+      console.log();
+      showStatus(`Claude exited with code ${error.exitCode}`, 'warning');
     }
   }
 }

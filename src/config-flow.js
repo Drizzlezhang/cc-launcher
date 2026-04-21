@@ -7,9 +7,14 @@ import {
   VERTEX_REGIONS,
   hasAdcConfigured,
   getCurrentProjectId,
-  printAuthGuide,
   isGcloudInstalled,
 } from './vertex.js';
+import {
+  showConfigBanner,
+  showStatus,
+  showWarning,
+  showConfigSaved,
+} from './banner.js';
 
 async function runNewApiConfig(currentConfig) {
   // Prompt for baseurl and apikey
@@ -17,10 +22,10 @@ async function runNewApiConfig(currentConfig) {
     {
       type: 'input',
       name: 'baseurl',
-      message: 'NewAPI Base URL:',
+      message: '🔗 Enter API endpoint URL:',
       default: currentConfig.baseurl || '',
       validate: (input) => {
-        if (!input.trim()) return 'Base URL is required';
+        if (!input.trim()) return 'Endpoint URL is required';
         try {
           new URL(input);
           return true;
@@ -32,39 +37,43 @@ async function runNewApiConfig(currentConfig) {
     {
       type: 'password',
       name: 'apikey',
-      message: 'API Key:',
+      message: '🔑 Enter your API key:',
       default: currentConfig.apikey || '',
       validate: (input) => {
-        if (!input.trim()) return 'API Key is required';
+        if (!input.trim()) return 'API key is required';
         return true;
       },
     },
   ]);
 
   console.log();
-  console.log(chalk.gray('Fetching available models...'));
+  showStatus('Fetching available models...', 'loading');
 
   // Fetch models
   let models;
   try {
     models = await fetchModels(answers.baseurl, answers.apikey);
     if (models.length === 0) {
-      console.error(chalk.red('No models found.'));
+      console.log();
+      showWarning('No models found from this endpoint.');
       process.exit(1);
     }
-    console.log(chalk.green(`Found ${models.length} models`));
+    showStatus(`Found ${models.length} models`, 'success');
   } catch (error) {
-    console.error(chalk.red(`Error: ${error.message}`));
+    console.log();
+    showStatus(error.message, 'error');
     process.exit(1);
   }
 
+  console.log();
+
   // Prompt for model selection
-  const pageSize = Math.min(15, models.length);
+  const pageSize = Math.min(12, models.length);
   const modelAnswer = await inquirer.prompt([
     {
       type: 'list',
       name: 'selectedModel',
-      message: 'Select default model:',
+      message: '🤖 Choose your default model:',
       choices: models,
       default: currentConfig.selectedModel || models[0],
       pageSize,
@@ -84,9 +93,8 @@ async function runVertexConfig(currentConfig) {
   // Check gcloud installation
   if (!isGcloudInstalled()) {
     console.log();
-    console.log(chalk.yellow('Warning: gcloud CLI is not installed.'));
-    console.log(chalk.gray('Please install Google Cloud SDK first:'));
-    console.log(chalk.cyan('  https://cloud.google.com/sdk/docs/install'));
+    showWarning('gcloud CLI is not installed.');
+    console.log(chalk.gray('  Install from: https://cloud.google.com/sdk/docs/install'));
     console.log();
 
     const { continueAnyway } = await inquirer.prompt([
@@ -107,43 +115,44 @@ async function runVertexConfig(currentConfig) {
   const adcConfigured = hasAdcConfigured();
   if (!adcConfigured) {
     console.log();
-    console.log(chalk.yellow('Warning: Application Default Credentials (ADC) not configured.'));
-    printAuthGuide();
+    showWarning('Application Default Credentials (ADC) not configured.');
+    console.log(chalk.gray('  Run: gcloud auth application-default login'));
+    console.log();
 
     const { setupNow } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'setupNow',
-        message: 'Would you like to run "gcloud auth application-default login" now?',
+        message: 'Run gcloud auth now?',
         default: true,
       },
     ]);
 
     if (setupNow) {
       console.log();
-      console.log(chalk.cyan('Running gcloud auth application-default login...'));
-      console.log(chalk.gray('Please complete the authentication in your browser.'));
+      showStatus('Opening browser for authentication...', 'loading');
       console.log();
 
       try {
         const { execSync } = await import('child_process');
         execSync('gcloud auth application-default login', { stdio: 'inherit' });
-        console.log(chalk.green('Authentication successful!'));
+        showStatus('Authentication successful!', 'success');
       } catch (error) {
-        console.log(chalk.red('Authentication failed. You can set up credentials later.'));
+        showStatus('Authentication failed. You can set up credentials later.', 'warning');
       }
     }
   }
 
   // Get default project ID
   const defaultProjectId = getCurrentProjectId();
+  console.log();
 
   // Prompt for Vertex configuration
   const answers = await inquirer.prompt([
     {
       type: 'input',
       name: 'projectId',
-      message: 'GCP Project ID:',
+      message: '📊 Enter GCP Project ID:',
       default: currentConfig.projectId || defaultProjectId || '',
       validate: (input) => {
         if (!input.trim()) return 'Project ID is required';
@@ -153,9 +162,9 @@ async function runVertexConfig(currentConfig) {
     {
       type: 'list',
       name: 'region',
-      message: 'Select Region:',
+      message: '🌍 Choose a region:',
       choices: VERTEX_REGIONS.map((r) => ({
-        name: `${r.name} - ${r.description}`,
+        name: `${r.name} ${chalk.gray(`(${r.description})`)}`,
         value: r.id,
       })),
       default: currentConfig.region || 'global',
@@ -163,9 +172,9 @@ async function runVertexConfig(currentConfig) {
     {
       type: 'list',
       name: 'vertexModel',
-      message: 'Select Claude Model:',
+      message: '🤖 Choose Claude model:',
       choices: VERTEX_MODELS.map((m) => ({
-        name: `${m.name} (${m.context} context)`,
+        name: `${m.name} ${chalk.gray(`(${m.context})`)}`,
         value: m.id,
       })),
       default: currentConfig.vertexModel || 'claude-sonnet-4-6',
@@ -173,7 +182,7 @@ async function runVertexConfig(currentConfig) {
     {
       type: 'input',
       name: 'serviceAccountKeyPath',
-      message: 'Service Account Key path (optional, press Enter to use ADC):',
+      message: '🔐 Service Account Key path (optional, press Enter to use ADC):',
       default: currentConfig.serviceAccountKeyPath || '',
     },
   ]);
@@ -189,9 +198,7 @@ async function runVertexConfig(currentConfig) {
 }
 
 export async function runConfigFlow() {
-  console.log(chalk.cyan.bold('cc-launcher Configuration'));
-  console.log(chalk.gray('Configure your API settings for Claude Code'));
-  console.log();
+  showConfigBanner();
 
   // Get current config for default values
   const currentConfig = getConfig();
@@ -201,10 +208,10 @@ export async function runConfigFlow() {
     {
       type: 'list',
       name: 'channel',
-      message: 'Select API Channel:',
+      message: '🌐 Choose your API provider:',
       choices: [
-        { name: 'NewAPI (OpenAI-compatible API)', value: 'newapi' },
-        { name: 'Google Vertex AI', value: 'vertex' },
+        { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
+        { name: `Google Vertex AI ${chalk.gray('(GCP)')}`, value: 'vertex' },
       ],
       default: currentConfig.channel || 'newapi',
     },
@@ -219,13 +226,11 @@ export async function runConfigFlow() {
     await runNewApiConfig(currentConfig);
   }
 
-  console.log();
-  console.log(chalk.green('Configuration saved successfully!'));
-  console.log(chalk.gray('Config file: ~/.config/cc-launcher/config.json'));
+  showConfigSaved('~/.config/cc-launcher/config.json');
 
   if (channelAnswer.channel === 'vertex') {
+    showWarning('Make sure you have access to Claude models in Vertex AI Model Garden.');
+    console.log(chalk.gray('  Visit: https://console.cloud.google.com/vertex-ai/model-garden'));
     console.log();
-    console.log(chalk.yellow('Note: Make sure you have access to Claude models in Vertex AI Model Garden.'));
-    console.log(chalk.gray('Visit: https://console.cloud.google.com/vertex-ai/model-garden'));
   }
 }

@@ -4,6 +4,7 @@ import { program } from 'commander';
 import chalk from 'chalk';
 import { runConfigFlow } from './config-flow.js';
 import { launchClaude } from './launcher.js';
+import { showBanner } from './banner.js';
 
 program
   .name('cc-launcher')
@@ -12,15 +13,13 @@ program
   .option('-c, --config', 'Run interactive configuration')
   .option('--clear', 'Clear saved configuration')
   .action(async (options) => {
-    console.log();
-    console.log(chalk.cyan.bold('  cc-launcher'));
-    console.log(chalk.gray('  API Manager for Claude Code'));
-    console.log();
+    showBanner();
 
     if (options.clear) {
       const { clearConfig } = await import('./config.js');
       clearConfig();
-      console.log(chalk.green('Configuration cleared.'));
+      console.log(chalk.green('  ✅ Configuration cleared.'));
+      console.log();
       process.exit(0);
     }
 
