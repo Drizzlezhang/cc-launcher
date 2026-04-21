@@ -7,14 +7,14 @@ import { launchClaude } from './launcher.js';
 
 program
   .name('cc-launcher')
-  .description('Manage NewAPI config and launch Claude Code CLI')
-  .version('1.0.0')
+  .description('Manage API config and launch Claude Code CLI (supports NewAPI and Google Vertex AI)')
+  .version('1.1.0')
   .option('-c, --config', 'Run interactive configuration')
   .option('--clear', 'Clear saved configuration')
   .action(async (options) => {
     console.log();
     console.log(chalk.cyan.bold('  cc-launcher'));
-    console.log(chalk.gray('  NewAPI Manager for Claude Code'));
+    console.log(chalk.gray('  API Manager for Claude Code'));
     console.log();
 
     if (options.clear) {
