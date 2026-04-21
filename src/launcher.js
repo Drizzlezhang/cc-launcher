@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import chalk from 'chalk';
-import { getConfig, hasValidConfig } from './config.js';
+import { getConfig, hasValidConfig, getChannel } from './config.js';
 import { runConfigFlow } from './config-flow.js';
 
 const SETTINGS_PATH = join(homedir(), '.claude', 'settings.drizzle.json');
@@ -25,13 +25,42 @@ function writeSettings(settings) {
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
 }
 
-function updateSettingsEnv(settings, { baseurl, apikey, selectedModel }) {
+function updateSettingsForNewApi(settings, { baseurl, apikey, selectedModel }) {
   if (!settings.env) {
     settings.env = {};
   }
+  // Clear Vertex settings if any
+  delete settings.env.CLAUDE_CODE_USE_VERTEX;
+  delete settings.env.CLOUD_ML_REGION;
+  delete settings.env.ANTHROPIC_VERTEX_PROJECT_ID;
+  delete settings.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  // Set NewAPI settings
   settings.env.ANTHROPIC_BASE_URL = baseurl;
   settings.env.ANTHROPIC_AUTH_TOKEN = apikey;
   settings.env.ANTHROPIC_MODEL = selectedModel;
+  return settings;
+}
+
+function updateSettingsForVertex(settings, { projectId, region, vertexModel, serviceAccountKeyPath }) {
+  if (!settings.env) {
+    settings.env = {};
+  }
+  // Clear NewAPI settings if any
+  delete settings.env.ANTHROPIC_BASE_URL;
+  delete settings.env.ANTHROPIC_AUTH_TOKEN;
+
+  // Set Vertex AI settings
+  settings.env.CLAUDE_CODE_USE_VERTEX = '1';
+  settings.env.CLOUD_ML_REGION = region || 'global';
+  settings.env.ANTHROPIC_VERTEX_PROJECT_ID = projectId;
+  settings.env.ANTHROPIC_MODEL = vertexModel;
+
+  // Optional: Service Account Key
+  if (serviceAccountKeyPath) {
+    settings.env.GOOGLE_APPLICATION_CREDENTIALS = serviceAccountKeyPath;
+  }
+
   return settings;
 }
 
@@ -49,16 +78,28 @@ export async function launchClaude() {
   }
 
   const config = getConfig();
+  const channel = getChannel();
 
   // Update settings.drizzle.json
   console.log(chalk.gray('Updating Claude settings...'));
   const settings = readSettings();
-  updateSettingsEnv(settings, config);
-  writeSettings(settings);
 
-  console.log(chalk.green('Settings updated successfully!'));
-  console.log(chalk.gray(`  Base URL: ${config.baseurl}`));
-  console.log(chalk.gray(`  Model: ${config.selectedModel}`));
+  if (channel === 'vertex') {
+    updateSettingsForVertex(settings, config);
+    console.log(chalk.green('Settings updated successfully!'));
+    console.log(chalk.gray(`  Channel: Google Vertex AI`));
+    console.log(chalk.gray(`  Project: ${config.projectId}`));
+    console.log(chalk.gray(`  Region: ${config.region}`));
+    console.log(chalk.gray(`  Model: ${config.vertexModel}`));
+  } else {
+    updateSettingsForNewApi(settings, config);
+    console.log(chalk.green('Settings updated successfully!'));
+    console.log(chalk.gray(`  Channel: NewAPI`));
+    console.log(chalk.gray(`  Base URL: ${config.baseurl}`));
+    console.log(chalk.gray(`  Model: ${config.selectedModel}`));
+  }
+
+  writeSettings(settings);
   console.log();
 
   // Launch claude

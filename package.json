@@ -1,8 +1,8 @@
 {
   "name": "@drizzlezhang/cc-launcher",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
-  "description": "Manage NewAPI config and launch Claude Code CLI",
+  "description": "Manage API config and launch Claude Code CLI (supports NewAPI and Google Vertex AI)",
   "author": "Drizzlezhang",
   "license": "MIT",
   "repository": {
@@ -19,6 +19,8 @@
     "claude",
     "cli",
     "newapi",
+    "vertex",
+    "google-cloud",
     "launcher"
   ],
   "publishConfig": {
