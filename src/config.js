@@ -9,10 +9,42 @@ const config = new Conf({
 });
 
 /**
+ * 获取原始配置对象
+ */
+export function getRawConfig() {
+  return {
+    mode: config.get('mode') || 'personal',
+    work: config.get('work') || {},
+    personal: config.get('personal') || {},
+  };
+}
+
+/**
+ * 设置当前模式
+ */
+export function setMode(mode) {
+  config.set('mode', mode);
+}
+
+/**
  * 获取当前模式
  */
 export function getMode() {
   return config.get('mode') || 'personal';
+}
+
+/**
+ * 获取 work 配置
+ */
+export function getWorkConfig() {
+  return config.get('work') || {};
+}
+
+/**
+ * 获取 personal 配置
+ */
+export function getPersonalConfig() {
+  return config.get('personal') || {};
 }
 
 /**
@@ -22,7 +54,7 @@ export function getConfig() {
   const mode = getMode();
 
   if (mode === 'work') {
-    const work = config.get('work') || {};
+    const work = getWorkConfig();
     return {
       mode: 'work',
       channel: 'newapi',
@@ -31,15 +63,13 @@ export function getConfig() {
       selectedModel: work.selectedModel,
     };
   } else {
-    const personal = config.get('personal') || {};
+    const personal = getPersonalConfig();
     return {
       mode: 'personal',
       channel: personal.channel || 'newapi',
-      // NewAPI
       baseurl: personal.baseurl,
       apikey: personal.apikey,
       selectedModel: personal.selectedModel,
-      // Vertex
       projectId: personal.projectId,
       region: personal.region,
       vertexModel: personal.vertexModel,
@@ -56,7 +86,7 @@ export function getChannel() {
   if (mode === 'work') {
     return 'newapi';
   }
-  const personal = config.get('personal') || {};
+  const personal = getPersonalConfig();
   return personal.channel || 'newapi';
 }
 
@@ -64,7 +94,6 @@ export function getChannel() {
  * 设置配置（自动根据 mode 存储到对应区域）
  */
 export function setConfig(data) {
-  // 更新 mode
   if (data.mode !== undefined) {
     config.set('mode', data.mode);
   }
@@ -72,21 +101,17 @@ export function setConfig(data) {
   const mode = data.mode || getMode();
 
   if (mode === 'work') {
-    // 保存到 work 区域
-    const work = config.get('work') || {};
+    const work = getWorkConfig();
     if (data.baseurl !== undefined) work.baseurl = data.baseurl;
     if (data.apikey !== undefined) work.apikey = data.apikey;
     if (data.selectedModel !== undefined) work.selectedModel = data.selectedModel;
     config.set('work', work);
   } else {
-    // 保存到 personal 区域
-    const personal = config.get('personal') || {};
+    const personal = getPersonalConfig();
     if (data.channel !== undefined) personal.channel = data.channel;
-    // NewAPI
     if (data.baseurl !== undefined) personal.baseurl = data.baseurl;
     if (data.apikey !== undefined) personal.apikey = data.apikey;
     if (data.selectedModel !== undefined) personal.selectedModel = data.selectedModel;
-    // Vertex
     if (data.projectId !== undefined) personal.projectId = data.projectId;
     if (data.region !== undefined) personal.region = data.region;
     if (data.vertexModel !== undefined) personal.vertexModel = data.vertexModel;
@@ -103,24 +128,33 @@ export function clearConfig() {
 }
 
 /**
+ * 检查 work 模式是否有有效配置
+ */
+export function hasWorkConfig() {
+  const work = getWorkConfig();
+  return !!(work.baseurl && work.apikey && work.selectedModel);
+}
+
+/**
+ * 检查 personal 模式是否有有效配置
+ */
+export function hasPersonalConfig() {
+  const personal = getPersonalConfig();
+  const channel = personal.channel || 'newapi';
+
+  if (channel === 'vertex') {
+    return !!(personal.projectId && personal.region && personal.vertexModel);
+  } else {
+    return !!(personal.baseurl && personal.apikey && personal.selectedModel);
+  }
+}
+
+/**
  * 检查当前模式是否有有效配置
  */
 export function hasValidConfig() {
   const mode = getMode();
-
-  if (mode === 'work') {
-    const work = config.get('work') || {};
-    return !!(work.baseurl && work.apikey && work.selectedModel);
-  } else {
-    const personal = config.get('personal') || {};
-    const channel = personal.channel || 'newapi';
-
-    if (channel === 'vertex') {
-      return !!(personal.projectId && personal.region && personal.vertexModel);
-    } else {
-      return !!(personal.baseurl && personal.apikey && personal.selectedModel);
-    }
-  }
+  return mode === 'work' ? hasWorkConfig() : hasPersonalConfig();
 }
 
 export default config;

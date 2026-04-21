@@ -1,6 +1,12 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { getConfig, setConfig } from './config.js';
+import {
+  setMode,
+  getMode,
+  getWorkConfig,
+  getPersonalConfig,
+  setConfig,
+} from './config.js';
 import { fetchModels } from './api.js';
 import {
   VERTEX_MODELS,
@@ -16,6 +22,8 @@ import {
   showConfigSaved,
 } from './banner.js';
 
+const BACK_OPTION = chalk.gray('← Back');
+
 async function fetchAndSelectModel(baseurl, apikey, defaultModel) {
   console.log();
   showStatus('Fetching available models...', 'loading');
@@ -26,36 +34,36 @@ async function fetchAndSelectModel(baseurl, apikey, defaultModel) {
     if (models.length === 0) {
       console.log();
       showWarning('No models found from this endpoint.');
-      process.exit(1);
+      return null;
     }
     showStatus(`Found ${models.length} models`, 'success');
   } catch (error) {
     console.log();
     showStatus(error.message, 'error');
-    process.exit(1);
+    return null;
   }
 
   console.log();
 
   const pageSize = Math.min(12, models.length);
-  const modelAnswer = await inquirer.prompt([
+  const { selectedModel } = await inquirer.prompt([
     {
       type: 'list',
       name: 'selectedModel',
       message: '🤖 Choose your default model:',
-      choices: models,
+      choices: [...models, BACK_OPTION],
       default: defaultModel || models[0],
       pageSize,
     },
   ]);
 
-  return modelAnswer.selectedModel;
+  return selectedModel === BACK_OPTION ? null : selectedModel;
 }
 
 async function runWorkConfig() {
-  const workConfig = getConfig().work || {};
+  const workConfig = getWorkConfig();
 
-  const answers = await inquirer.prompt([
+  const { baseurl } = await inquirer.prompt([
     {
       type: 'input',
       name: 'baseurl',
@@ -71,6 +79,9 @@ async function runWorkConfig() {
         }
       },
     },
+  ]);
+
+  const { apikey } = await inquirer.prompt([
     {
       type: 'password',
       name: 'apikey',
@@ -83,19 +94,22 @@ async function runWorkConfig() {
     },
   ]);
 
-  const selectedModel = await fetchAndSelectModel(answers.baseurl, answers.apikey, workConfig.selectedModel);
+  const selectedModel = await fetchAndSelectModel(baseurl, apikey, workConfig.selectedModel);
+  if (!selectedModel) return false;
 
   setConfig({
-    baseurl: answers.baseurl,
-    apikey: answers.apikey,
+    baseurl,
+    apikey,
     selectedModel,
   });
+
+  return true;
 }
 
 async function runNewApiConfig() {
-  const personalConfig = getConfig().personal || {};
+  const personalConfig = getPersonalConfig();
 
-  const answers = await inquirer.prompt([
+  const { baseurl } = await inquirer.prompt([
     {
       type: 'input',
       name: 'baseurl',
@@ -111,6 +125,9 @@ async function runNewApiConfig() {
         }
       },
     },
+  ]);
+
+  const { apikey } = await inquirer.prompt([
     {
       type: 'password',
       name: 'apikey',
@@ -123,18 +140,21 @@ async function runNewApiConfig() {
     },
   ]);
 
-  const selectedModel = await fetchAndSelectModel(answers.baseurl, answers.apikey, personalConfig.selectedModel);
+  const selectedModel = await fetchAndSelectModel(baseurl, apikey, personalConfig.selectedModel);
+  if (!selectedModel) return false;
 
   setConfig({
     channel: 'newapi',
-    baseurl: answers.baseurl,
-    apikey: answers.apikey,
+    baseurl,
+    apikey,
     selectedModel,
   });
+
+  return true;
 }
 
 async function runVertexConfig() {
-  const personalConfig = getConfig().personal || {};
+  const personalConfig = getPersonalConfig();
 
   if (!isGcloudInstalled()) {
     console.log();
@@ -146,13 +166,13 @@ async function runVertexConfig() {
       {
         type: 'confirm',
         name: 'continueAnyway',
-        message: 'Continue without gcloud CLI? (You will need to set up credentials manually)',
+        message: 'Continue without gcloud CLI?',
         default: false,
       },
     ]);
 
     if (!continueAnyway) {
-      process.exit(1);
+      return false;
     }
   }
 
@@ -187,8 +207,9 @@ async function runVertexConfig() {
     }
   }
 
-  const defaultProjectId = getCurrentProjectId();
   console.log();
+
+  const defaultProjectId = getCurrentProjectId();
 
   const answers = await inquirer.prompt([
     {
@@ -205,22 +226,32 @@ async function runVertexConfig() {
       type: 'list',
       name: 'region',
       message: '🌍 Choose a region:',
-      choices: VERTEX_REGIONS.map((r) => ({
+      choices: [...VERTEX_REGIONS.map((r) => ({
         name: `${r.name} ${chalk.gray(`(${r.description})`)}`,
         value: r.id,
-      })),
+      })), BACK_OPTION],
       default: personalConfig.region || 'global',
     },
+  ]);
+
+  if (answers.region === BACK_OPTION) return false;
+
+  const { vertexModel } = await inquirer.prompt([
     {
       type: 'list',
       name: 'vertexModel',
       message: '🤖 Choose Claude model:',
-      choices: VERTEX_MODELS.map((m) => ({
+      choices: [...VERTEX_MODELS.map((m) => ({
         name: `${m.name} ${chalk.gray(`(${m.context})`)}`,
         value: m.id,
-      })),
+      })), BACK_OPTION],
       default: personalConfig.vertexModel || 'claude-sonnet-4-6',
     },
+  ]);
+
+  if (vertexModel === BACK_OPTION) return false;
+
+  const { serviceAccountKeyPath } = await inquirer.prompt([
     {
       type: 'input',
       name: 'serviceAccountKeyPath',
@@ -233,66 +264,96 @@ async function runVertexConfig() {
     channel: 'vertex',
     projectId: answers.projectId,
     region: answers.region,
-    vertexModel: answers.vertexModel,
-    serviceAccountKeyPath: answers.serviceAccountKeyPath || undefined,
+    vertexModel,
+    serviceAccountKeyPath: serviceAccountKeyPath || undefined,
   });
+
+  return true;
 }
 
 export async function runConfigFlow() {
   showConfigBanner();
 
-  // 读取完整配置
-  const fullConfig = {
-    mode: 'personal',
-    personal: {},
-    work: {},
-  };
+  let currentStep = 'mode';
 
-  // Step 1: 模式选择
-  const modeAnswer = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'mode',
-      message: '👤 Select mode:',
-      choices: [
-        { name: `Personal ${chalk.gray('(configure yourself)')}`, value: 'personal' },
-        { name: `Work ${chalk.gray('(company environment)')}`, value: 'work' },
-      ],
-      default: 'personal',
-    },
-  ]);
+  while (true) {
+    if (currentStep === 'mode') {
+      const { mode } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'mode',
+          message: '👤 Select mode:',
+          choices: [
+            { name: `Personal ${chalk.gray('(configure yourself)')}`, value: 'personal' },
+            { name: `Work ${chalk.gray('(company environment)')}`, value: 'work' },
+            { name: BACK_OPTION, value: 'exit' },
+          ],
+          default: getMode(),
+        },
+      ]);
 
-  // 先设置模式
-  setConfig({ mode: modeAnswer.mode });
+      if (mode === 'exit') {
+        console.log();
+        return;
+      }
 
-  console.log();
+      setMode(mode);
+      console.log();
 
-  if (modeAnswer.mode === 'work') {
-    await runWorkConfig();
-  } else {
-    const personalConfig = getConfig().personal || {};
+      if (mode === 'work') {
+        const success = await runWorkConfig();
+        if (success) {
+          showConfigSaved('~/.config/cc-launcher/config.json');
+          return;
+        }
+        // 失败则回到模式选择
+        currentStep = 'mode';
+        console.log();
+      } else {
+        currentStep = 'channel';
+      }
+    }
 
-    const channelAnswer = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'channel',
-        message: '🌐 Choose your API provider:',
-        choices: [
-          { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
-          { name: `Google Vertex AI ${chalk.gray('(GCP)')}`, value: 'vertex' },
-        ],
-        default: personalConfig.channel || 'newapi',
-      },
-    ]);
+    if (currentStep === 'channel') {
+      const personalConfig = getPersonalConfig();
 
-    console.log();
+      const { channel } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'channel',
+          message: '🌐 Choose your API provider:',
+          choices: [
+            { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
+            { name: `Google Vertex AI ${chalk.gray('(GCP)')}`, value: 'vertex' },
+            { name: BACK_OPTION, value: 'back' },
+          ],
+          default: personalConfig.channel || 'newapi',
+        },
+      ]);
 
-    if (channelAnswer.channel === 'vertex') {
-      await runVertexConfig();
-    } else {
-      await runNewApiConfig();
+      if (channel === 'back') {
+        currentStep = 'mode';
+        console.log();
+        continue;
+      }
+
+      console.log();
+
+      let success;
+      if (channel === 'vertex') {
+        success = await runVertexConfig();
+      } else {
+        success = await runNewApiConfig();
+      }
+
+      if (success) {
+        showConfigSaved('~/.config/cc-launcher/config.json');
+        return;
+      }
+
+      // 失败则回到渠道选择
+      currentStep = 'channel';
+      console.log();
     }
   }
-
-  showConfigSaved('~/.config/cc-launcher/config.json');
 }

@@ -2,8 +2,17 @@ import { execa } from 'execa';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { getConfig, hasValidConfig, getChannel, getMode } from './config.js';
+import {
+  getConfig,
+  hasValidConfig,
+  hasWorkConfig,
+  hasPersonalConfig,
+  getChannel,
+  getMode,
+  setMode,
+} from './config.js';
 import { runConfigFlow } from './config-flow.js';
 import { showLaunchInfo, showStatus } from './banner.js';
 
@@ -29,13 +38,11 @@ function updateSettingsForNewApi(settings, { baseurl, apikey, selectedModel }) {
   if (!settings.env) {
     settings.env = {};
   }
-  // Clear Vertex settings if any
   delete settings.env.CLAUDE_CODE_USE_VERTEX;
   delete settings.env.CLOUD_ML_REGION;
   delete settings.env.ANTHROPIC_VERTEX_PROJECT_ID;
   delete settings.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-  // Set NewAPI settings
   settings.env.ANTHROPIC_BASE_URL = baseurl;
   settings.env.ANTHROPIC_AUTH_TOKEN = apikey;
   settings.env.ANTHROPIC_MODEL = selectedModel;
@@ -46,17 +53,14 @@ function updateSettingsForVertex(settings, { projectId, region, vertexModel, ser
   if (!settings.env) {
     settings.env = {};
   }
-  // Clear NewAPI settings if any
   delete settings.env.ANTHROPIC_BASE_URL;
   delete settings.env.ANTHROPIC_AUTH_TOKEN;
 
-  // Set Vertex AI settings
   settings.env.CLAUDE_CODE_USE_VERTEX = '1';
   settings.env.CLOUD_ML_REGION = region || 'global';
   settings.env.ANTHROPIC_VERTEX_PROJECT_ID = projectId;
   settings.env.ANTHROPIC_MODEL = vertexModel;
 
-  // Optional: Service Account Key
   if (serviceAccountKeyPath) {
     settings.env.GOOGLE_APPLICATION_CREDENTIALS = serviceAccountKeyPath;
   }
@@ -64,21 +68,53 @@ function updateSettingsForVertex(settings, { projectId, region, vertexModel, ser
   return settings;
 }
 
+async function selectModeOnLaunch() {
+  const workValid = hasWorkConfig();
+  const personalValid = hasPersonalConfig();
+
+  if (workValid && personalValid) {
+    // 两者都有效，询问选择
+    const { mode } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'mode',
+        message: '👤 Select mode to use:',
+        choices: [
+          { name: `Personal ${chalk.gray('(your config)')}`, value: 'personal' },
+          { name: `Work ${chalk.gray('(company environment)')}`, value: 'work' },
+        ],
+        default: getMode(),
+      },
+    ]);
+    return mode;
+  } else if (workValid) {
+    return 'work';
+  } else if (personalValid) {
+    return 'personal';
+  }
+  return null;
+}
+
 export async function launchClaude() {
-  // Check if config exists
-  if (!hasValidConfig()) {
+  // 检查配置状态并选择模式
+  const mode = await selectModeOnLaunch();
+
+  if (!mode) {
+    // 没有任何有效配置
     showStatus('No configuration found. Starting setup...', 'warning');
     await runConfigFlow();
-    // After config, read the new config
+
     if (!hasValidConfig()) {
       showStatus('Configuration failed. Exiting.', 'error');
       process.exit(1);
     }
+  } else {
+    setMode(mode);
   }
 
   const config = getConfig();
   const channel = getChannel();
-  const mode = getMode();
+  const currentMode = getMode();
 
   // Update settings.drizzle.json
   showStatus('Updating Claude settings...', 'saving');
@@ -94,7 +130,7 @@ export async function launchClaude() {
   writeSettings(settings);
 
   // Show launch info
-  showLaunchInfo(mode, channel, config);
+  showLaunchInfo(currentMode, channel, config);
 
   // Launch claude
   showStatus('Starting Claude Code...', 'launching');
@@ -112,7 +148,6 @@ export async function launchClaude() {
       console.log();
       process.exit(1);
     }
-    // If the process exited with a code, that's normal (user quit)
     if (error.exitCode !== undefined && error.exitCode !== 0) {
       console.log();
       showStatus(`Claude exited with code ${error.exitCode}`, 'warning');
