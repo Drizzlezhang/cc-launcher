@@ -16,8 +16,84 @@ import {
   showConfigSaved,
 } from './banner.js';
 
+async function fetchAndSelectModel(baseurl, apikey, currentConfig) {
+  console.log();
+  showStatus('Fetching available models...', 'loading');
+
+  let models;
+  try {
+    models = await fetchModels(baseurl, apikey);
+    if (models.length === 0) {
+      console.log();
+      showWarning('No models found from this endpoint.');
+      process.exit(1);
+    }
+    showStatus(`Found ${models.length} models`, 'success');
+  } catch (error) {
+    console.log();
+    showStatus(error.message, 'error');
+    process.exit(1);
+  }
+
+  console.log();
+
+  const pageSize = Math.min(12, models.length);
+  const modelAnswer = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedModel',
+      message: '🤖 Choose your default model:',
+      choices: models,
+      default: currentConfig.selectedModel || models[0],
+      pageSize,
+    },
+  ]);
+
+  return modelAnswer.selectedModel;
+}
+
+async function runWorkConfig(currentConfig) {
+  // 工作模式：直接配置 NewAPI
+  const answers = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'baseurl',
+      message: '🔗 Enter work API endpoint URL:',
+      default: currentConfig.baseurl || '',
+      validate: (input) => {
+        if (!input.trim()) return 'Endpoint URL is required';
+        try {
+          new URL(input);
+          return true;
+        } catch {
+          return 'Please enter a valid URL';
+        }
+      },
+    },
+    {
+      type: 'password',
+      name: 'apikey',
+      message: '🔑 Enter work API key:',
+      default: currentConfig.apikey || '',
+      validate: (input) => {
+        if (!input.trim()) return 'API key is required';
+        return true;
+      },
+    },
+  ]);
+
+  const selectedModel = await fetchAndSelectModel(answers.baseurl, answers.apikey, currentConfig);
+
+  setConfig({
+    mode: 'work',
+    channel: 'newapi',
+    baseurl: answers.baseurl,
+    apikey: answers.apikey,
+    selectedModel,
+  });
+}
+
 async function runNewApiConfig(currentConfig) {
-  // Prompt for baseurl and apikey
   const answers = await inquirer.prompt([
     {
       type: 'input',
@@ -46,51 +122,18 @@ async function runNewApiConfig(currentConfig) {
     },
   ]);
 
-  console.log();
-  showStatus('Fetching available models...', 'loading');
+  const selectedModel = await fetchAndSelectModel(answers.baseurl, answers.apikey, currentConfig);
 
-  // Fetch models
-  let models;
-  try {
-    models = await fetchModels(answers.baseurl, answers.apikey);
-    if (models.length === 0) {
-      console.log();
-      showWarning('No models found from this endpoint.');
-      process.exit(1);
-    }
-    showStatus(`Found ${models.length} models`, 'success');
-  } catch (error) {
-    console.log();
-    showStatus(error.message, 'error');
-    process.exit(1);
-  }
-
-  console.log();
-
-  // Prompt for model selection
-  const pageSize = Math.min(12, models.length);
-  const modelAnswer = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'selectedModel',
-      message: '🤖 Choose your default model:',
-      choices: models,
-      default: currentConfig.selectedModel || models[0],
-      pageSize,
-    },
-  ]);
-
-  // Save config
   setConfig({
+    mode: 'personal',
     channel: 'newapi',
     baseurl: answers.baseurl,
     apikey: answers.apikey,
-    selectedModel: modelAnswer.selectedModel,
+    selectedModel,
   });
 }
 
 async function runVertexConfig(currentConfig) {
-  // Check gcloud installation
   if (!isGcloudInstalled()) {
     console.log();
     showWarning('gcloud CLI is not installed.');
@@ -111,7 +154,6 @@ async function runVertexConfig(currentConfig) {
     }
   }
 
-  // Check ADC status
   const adcConfigured = hasAdcConfigured();
   if (!adcConfigured) {
     console.log();
@@ -143,11 +185,9 @@ async function runVertexConfig(currentConfig) {
     }
   }
 
-  // Get default project ID
   const defaultProjectId = getCurrentProjectId();
   console.log();
 
-  // Prompt for Vertex configuration
   const answers = await inquirer.prompt([
     {
       type: 'input',
@@ -187,8 +227,8 @@ async function runVertexConfig(currentConfig) {
     },
   ]);
 
-  // Save config
   setConfig({
+    mode: 'personal',
     channel: 'vertex',
     projectId: answers.projectId,
     region: answers.region,
@@ -200,37 +240,50 @@ async function runVertexConfig(currentConfig) {
 export async function runConfigFlow() {
   showConfigBanner();
 
-  // Get current config for default values
   const currentConfig = getConfig();
 
-  // First, ask for channel selection
-  const channelAnswer = await inquirer.prompt([
+  // Step 1: 模式选择
+  const modeAnswer = await inquirer.prompt([
     {
       type: 'list',
-      name: 'channel',
-      message: '🌐 Choose your API provider:',
+      name: 'mode',
+      message: '👤 Select mode:',
       choices: [
-        { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
-        { name: `Google Vertex AI ${chalk.gray('(GCP)')}`, value: 'vertex' },
+        { name: `Personal ${chalk.gray('(configure yourself)')}`, value: 'personal' },
+        { name: `Work ${chalk.gray('(company environment)')}`, value: 'work' },
       ],
-      default: currentConfig.channel || 'newapi',
+      default: currentConfig.mode || 'personal',
     },
   ]);
 
   console.log();
 
-  // Run appropriate configuration flow
-  if (channelAnswer.channel === 'vertex') {
-    await runVertexConfig(currentConfig);
+  if (modeAnswer.mode === 'work') {
+    // 工作模式：直接配置 NewAPI
+    await runWorkConfig(currentConfig);
   } else {
-    await runNewApiConfig(currentConfig);
+    // 个人模式：渠道选择
+    const channelAnswer = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'channel',
+        message: '🌐 Choose your API provider:',
+        choices: [
+          { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
+          { name: `Google Vertex AI ${chalk.gray('(GCP)')}`, value: 'vertex' },
+        ],
+        default: currentConfig.channel || 'newapi',
+      },
+    ]);
+
+    console.log();
+
+    if (channelAnswer.channel === 'vertex') {
+      await runVertexConfig(currentConfig);
+    } else {
+      await runNewApiConfig(currentConfig);
+    }
   }
 
   showConfigSaved('~/.config/cc-launcher/config.json');
-
-  if (channelAnswer.channel === 'vertex') {
-    showWarning('Make sure you have access to Claude models in Vertex AI Model Garden.');
-    console.log(chalk.gray('  Visit: https://console.cloud.google.com/vertex-ai/model-garden'));
-    console.log();
-  }
 }

@@ -54,11 +54,15 @@ export function showConfigBanner() {
 /**
  * 显示启动信息
  */
-export function showLaunchInfo(channel, config) {
+export function showLaunchInfo(mode, channel, config) {
   console.log();
   console.log(chalk.cyan.bold('  📋 Configuration Summary'));
   console.log(chalk.gray('  ─────────────────────────'));
   console.log();
+
+  // 显示模式
+  const modeDisplay = mode === 'work' ? chalk.yellow('Work') : chalk.blue('Personal');
+  console.log(chalk.white('  👤 Mode:      ') + modeDisplay);
 
   if (channel === 'vertex') {
     console.log(chalk.white('  🌐 Channel:   ') + chalk.green('Google Vertex AI'));

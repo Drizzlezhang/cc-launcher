@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import chalk from 'chalk';
-import { getConfig, hasValidConfig, getChannel } from './config.js';
+import { getConfig, hasValidConfig, getChannel, getMode } from './config.js';
 import { runConfigFlow } from './config-flow.js';
 import { showLaunchInfo, showStatus } from './banner.js';
 
@@ -78,6 +78,7 @@ export async function launchClaude() {
 
   const config = getConfig();
   const channel = getChannel();
+  const mode = getMode();
 
   // Update settings.drizzle.json
   showStatus('Updating Claude settings...', 'saving');
@@ -93,7 +94,7 @@ export async function launchClaude() {
   writeSettings(settings);
 
   // Show launch info
-  showLaunchInfo(channel, config);
+  showLaunchInfo(mode, channel, config);
 
   // Launch claude
   showStatus('Starting Claude Code...', 'launching');

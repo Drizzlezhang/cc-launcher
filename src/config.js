@@ -10,6 +10,7 @@ const config = new Conf({
 
 export function getConfig() {
   return {
+    mode: config.get('mode') || 'personal',
     channel: config.get('channel') || 'newapi',
     // NewAPI 渠道配置
     baseurl: config.get('baseurl'),
@@ -27,7 +28,12 @@ export function getChannel() {
   return config.get('channel') || 'newapi';
 }
 
+export function getMode() {
+  return config.get('mode') || 'personal';
+}
+
 export function setConfig(data) {
+  if (data.mode !== undefined) config.set('mode', data.mode);
   if (data.channel !== undefined) config.set('channel', data.channel);
   // NewAPI
   if (data.baseurl !== undefined) config.set('baseurl', data.baseurl);
