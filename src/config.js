@@ -57,10 +57,14 @@ export function getConfig() {
     const work = getWorkConfig();
     return {
       mode: 'work',
-      channel: 'newapi',
+      channel: work.channel || 'newapi',
       baseurl: work.baseurl,
       apikey: work.apikey,
       selectedModel: work.selectedModel,
+      cocoModel: work.cocoModel,
+      codinModel: work.codinModel,
+      codinBaseurl: work.codinBaseurl,
+      codinToken: work.codinToken,
     };
   } else {
     const personal = getPersonalConfig();
@@ -85,7 +89,8 @@ export function getConfig() {
 export function getChannel() {
   const mode = getMode();
   if (mode === 'work') {
-    return 'newapi';
+    const work = getWorkConfig();
+    return work.channel || 'newapi';
   }
   const personal = getPersonalConfig();
   return personal.channel || 'newapi';
@@ -103,9 +108,14 @@ export function setConfig(data) {
 
   if (mode === 'work') {
     const work = getWorkConfig();
+    if (data.channel !== undefined) work.channel = data.channel;
     if (data.baseurl !== undefined) work.baseurl = data.baseurl;
     if (data.apikey !== undefined) work.apikey = data.apikey;
     if (data.selectedModel !== undefined) work.selectedModel = data.selectedModel;
+    if (data.cocoModel !== undefined) work.cocoModel = data.cocoModel;
+    if (data.codinModel !== undefined) work.codinModel = data.codinModel;
+    if (data.codinBaseurl !== undefined) work.codinBaseurl = data.codinBaseurl;
+    if (data.codinToken !== undefined) work.codinToken = data.codinToken;
     config.set('work', work);
   } else {
     const personal = getPersonalConfig();
@@ -134,7 +144,13 @@ export function clearConfig() {
  */
 export function hasWorkConfig() {
   const work = getWorkConfig();
-  return !!(work.baseurl && work.apikey && work.selectedModel);
+  const channel = work.channel || 'newapi';
+
+  if (channel === 'coco' || channel === 'codin') {
+    return true;
+  } else {
+    return !!(work.baseurl && work.apikey && work.selectedModel);
+  }
 }
 
 /**
