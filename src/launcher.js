@@ -167,8 +167,8 @@ async function selectLaunchMode() {
       message: '🚗 Choose Claude run mode:',
       choices: [
         { name: '1) 手动驾驶（claude）', value: 'manual' },
-        { name: '2) 辅助驾驶（claude --accept-edits）', value: 'assist' },
-        { name: '3) 自动驾驶（claude --auto）', value: 'auto' },
+        { name: '2) 辅助驾驶（claude --permission-mode acceptEdits）', value: 'assist' },
+        { name: '3) 自动驾驶（claude --permission-mode auto）', value: 'auto' },
       ],
       default: 'manual',
     },
@@ -180,9 +180,9 @@ async function selectLaunchMode() {
 function buildClaudeArgs(sessionSettingsPath, launchMode) {
   const args = [];
   if (launchMode === 'assist') {
-    args.push('--accept-edits');
+    args.push('--permission-mode', 'acceptEdits');
   } else if (launchMode === 'auto') {
-    args.push('--auto');
+    args.push('--permission-mode', 'auto');
   }
   args.push('--settings', sessionSettingsPath);
   return args;
