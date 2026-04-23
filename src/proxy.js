@@ -162,7 +162,7 @@ async function startCliBridgeProxy(tool) {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url || '/', 'http://127.0.0.1');
     const path = url.pathname;
-    const modelId = `${tool}-cli`;
+    const modelId = tool === 'coco' ? 'seeddance2.0' : 'seeddream2.0';
 
     if (req.method === 'GET' && path === '/health') {
       res.statusCode = 200;

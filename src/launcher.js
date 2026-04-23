@@ -134,7 +134,7 @@ function updateSettingsForCoco(settings, sidecar) {
   settings.env.ANTHROPIC_BASE_URL = sidecar.baseUrl;
   settings.env.ANTHROPIC_AUTH_TOKEN = sidecar.authToken || '';
   if (typeof sidecar?.close === 'function') {
-    settings.env.ANTHROPIC_MODEL = 'coco-cli';
+    settings.env.ANTHROPIC_MODEL = 'seeddance2.0';
   } else {
     delete settings.env.ANTHROPIC_MODEL;
   }
@@ -151,7 +151,7 @@ function updateSettingsForCodin(settings, sidecar) {
   settings.env.ANTHROPIC_BASE_URL = sidecar.baseUrl;
   settings.env.ANTHROPIC_AUTH_TOKEN = sidecar.authToken || '';
   if (typeof sidecar?.close === 'function') {
-    settings.env.ANTHROPIC_MODEL = 'codin-cli';
+    settings.env.ANTHROPIC_MODEL = 'seeddream2.0';
   } else {
     delete settings.env.ANTHROPIC_MODEL;
   }

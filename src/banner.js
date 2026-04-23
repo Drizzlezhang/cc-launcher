@@ -23,21 +23,14 @@ function getVersion() {
 export function showBanner() {
   const version = getVersion();
   console.log();
-  console.log(chalk.cyan('   ██████╗ ██████╗ ██████╗ ██╗     ██╗  ██╗██╗   ██╗'));
-  console.log(chalk.cyan('  ██╔════╝██╔═══██╗██╔══██╗██║     ██║ ██╔╝██║   ██║'));
-  console.log(chalk.cyan('  ██║     ██║   ██║██║  ██║██║     █████╔╝ ██║   ██║'));
-  console.log(chalk.cyan('  ██║     ██║   ██║██║  ██║██║     ██╔═██╗ ██║   ██║'));
-  console.log(chalk.cyan('  ╚██████╗╚██████╔╝██████╔╝███████╗██║  ██╗╚██████╔╝'));
-  console.log(chalk.cyan('   ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝ ╚═════╝ '));
+  console.log(chalk.cyan.bold('    ██████╗ ██████╗       ██╗      █████╗ ██╗   ██╗███╗   ██╗ ██████╗██╗  ██╗███████╗██████╗ '));
+  console.log(chalk.cyan.bold('   ██╔════╝██╔════╝       ██║     ██╔══██╗██║   ██║████╗  ██║██╔════╝██║  ██║██╔════╝██╔══██╗'));
+  console.log(chalk.cyan.bold('   ██║     ██║      █████╗██║     ███████║██║   ██║██╔██╗ ██║██║     ███████║█████╗  ██████╔╝'));
+  console.log(chalk.cyan.bold('   ██║     ██║      ╚════╝██║     ██╔══██║██║   ██║██║╚██╗██║██║     ██╔══██║██╔══╝  ██╔══██╗'));
+  console.log(chalk.cyan.bold('   ╚██████╗╚██████╗       ███████╗██║  ██║╚██████╔╝██║ ╚████║╚██████╗██║  ██║███████╗██║  ██║'));
+  console.log(chalk.gray('    ╚═════╝ ╚═════╝       ╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝'));
   console.log();
-  console.log(chalk.cyan.bold('  ██████╗ ██╗  ██╗███████╗███╗   ██╗ ██████╗███████╗'));
-  console.log(chalk.cyan.bold(' ██╔═══██╗██║  ██║██╔════╝████╗  ██║██╔════╝██╔════╝'));
-  console.log(chalk.cyan.bold(' ██║   ██║███████║█████╗  ██╔██╗ ██║██║     █████╗  '));
-  console.log(chalk.cyan.bold(' ██║   ██║██╔══██║██╔══╝  ██║╚██╗██║██║     ██╔══╝  '));
-  console.log(chalk.cyan.bold(' ╚██████╔╝██║  ██║███████╗██║ ╚████║╚██████╗███████╗'));
-  console.log(chalk.gray('  ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝ ╚═════╝╚══════╝'));
-  console.log();
-  console.log(chalk.magenta(`  v${version}`) + chalk.gray('  |  ') + chalk.white('DrizzleZhang'));
+  console.log(chalk.magenta(`  v${version}`) + chalk.gray('  |  ') + chalk.white('cc-launcher'));
   console.log();
 }
 
