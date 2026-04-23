@@ -159,6 +159,34 @@ function updateSettingsForCodin(settings, sidecar) {
   return settings;
 }
 
+async function selectLaunchMode() {
+  const { launchMode } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'launchMode',
+      message: '🚗 Choose Claude run mode:',
+      choices: [
+        { name: '1) 手动驾驶（claude）', value: 'manual' },
+        { name: '2) 辅助驾驶（claude --accept-edits）', value: 'assist' },
+        { name: '3) 自动驾驶（claude --auto）', value: 'auto' },
+      ],
+      default: 'manual',
+    },
+  ]);
+
+  return launchMode;
+}
+
+function buildClaudeArgs(sessionSettingsPath, launchMode) {
+  const args = [];
+  if (launchMode === 'assist') {
+    args.push('--accept-edits');
+  } else if (launchMode === 'auto') {
+    args.push('--auto');
+  }
+  args.push('--settings', sessionSettingsPath);
+  return args;
+}
 
 export async function launchClaude() {
   // 检查更新
@@ -274,12 +302,15 @@ export async function launchClaude() {
   // Show launch info
   showLaunchInfo(currentMode, channel, config);
 
+  const launchMode = await selectLaunchMode();
+  const claudeArgs = buildClaudeArgs(sessionSettingsPath, launchMode);
+
   // Launch claude
   showStatus('Starting Claude Code...', 'launching');
   console.log();
 
   try {
-    await execa('claude', ['--settings', sessionSettingsPath], {
+    await execa('claude', claudeArgs, {
       stdio: 'inherit',
       preferLocal: false,
     });
