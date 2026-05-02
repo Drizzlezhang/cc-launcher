@@ -21,14 +21,8 @@ import {
   showWarning,
   showConfigSaved,
 } from './banner.js';
-import {
-  checkAndShowCocoStatus,
-  checkAndShowCodinStatus,
-  getCocoModels,
-  getCodinModels,
-} from './tools.js';
 
-const BACK_OPTION = chalk.gray('← Back');
+const BACK_OPTION = '← Back';
 
 async function fetchAndSelectModel(baseurl, apikey, defaultModel) {
   console.log();
@@ -77,8 +71,8 @@ async function runWorkConfig() {
       message: '🌐 Choose your provider:',
       choices: [
         { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
-        { name: `coco ${chalk.gray('(Bytedance)')}`, value: 'coco' },
-        { name: `codin ${chalk.gray('(Bytedance)')}`, value: 'codin' },
+        { name: `aiden ${chalk.gray('(Bytedance)')}`, value: 'aiden' },
+        { name: `ttadk ${chalk.gray('(Bytedance)')}`, value: 'ttadk' },
         { name: BACK_OPTION, value: 'back' },
       ],
       default: workConfig.channel || 'newapi',
@@ -90,10 +84,11 @@ async function runWorkConfig() {
   console.log();
 
   // 根据渠道调用不同的配置函数
-  if (channel === 'coco') {
-    return await runCocoConfig();
-  } else if (channel === 'codin') {
-    return await runCodinConfig();
+  if (channel === 'aiden' || channel === 'ttadk') {
+    setConfig({
+      channel,
+    });
+    return true;
   }
 
   // NewAPI 渠道（原有逻辑）
@@ -136,152 +131,6 @@ async function runWorkConfig() {
     baseurl,
     apikey,
     selectedModel,
-  });
-
-  return true;
-}
-
-async function runCocoConfig() {
-  const workConfig = getWorkConfig();
-
-  console.log();
-
-  // 检查安装和登录状态
-  const status = await checkAndShowCocoStatus();
-  if (!status.canProceed) {
-    return false;
-  }
-
-  console.log();
-
-  // 获取并选择模型（动态优先，失败可手动输入）
-  const models = getCocoModels();
-
-  const choices = [
-    ...models,
-    chalk.gray('✏️  Enter model manually'),
-    BACK_OPTION,
-  ];
-
-  const { cocoModel } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'cocoModel',
-      message: '🤖 Choose model:',
-      choices,
-      default: workConfig.cocoModel && models.includes(workConfig.cocoModel)
-        ? workConfig.cocoModel
-        : models[0],
-    },
-  ]);
-
-  if (cocoModel === BACK_OPTION) return false;
-
-  let finalCocoModel = cocoModel;
-  if (cocoModel === chalk.gray('✏️  Enter model manually')) {
-    const { manualModel } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'manualModel',
-        message: '🤖 Enter coco model name:',
-        default: workConfig.cocoModel || '',
-        validate: (input) => input.trim() ? true : 'Model is required',
-      },
-    ]);
-    finalCocoModel = manualModel.trim();
-  }
-
-  setConfig({
-    channel: 'coco',
-    cocoModel: finalCocoModel,
-  });
-
-  return true;
-}
-
-async function runCodinConfig() {
-  const workConfig = getWorkConfig();
-
-  console.log();
-
-  // 检查安装和登录状态
-  const status = await checkAndShowCodinStatus();
-  if (!status.canProceed) {
-    return false;
-  }
-
-  console.log();
-
-  // 选择模型（动态优先，失败可手动输入）
-  const codinModels = getCodinModels();
-  const MANUAL_OPTION = '__manual__';
-
-  const { codinModel } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'codinModel',
-      message: '🤖 Choose model:',
-      choices: [
-        ...codinModels.map((m) => ({
-          name: m.name,
-          value: m.id,
-        })),
-        { name: chalk.gray('✏️  Enter model manually'), value: MANUAL_OPTION },
-        BACK_OPTION,
-      ],
-      default: workConfig.codinModel || codinModels[0]?.id || 'GPT-5',
-    },
-  ]);
-
-  if (codinModel === BACK_OPTION) return false;
-
-  let finalCodinModel = codinModel;
-  if (codinModel === MANUAL_OPTION) {
-    const { manualModel } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'manualModel',
-        message: '🤖 Enter codin model name:',
-        default: workConfig.codinModel || '',
-        validate: (input) => input.trim() ? true : 'Model is required',
-      },
-    ]);
-    finalCodinModel = manualModel.trim();
-  }
-
-  const { codinBaseurl } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'codinBaseurl',
-      message: '🔗 Enter codin endpoint URL:',
-      default: workConfig.codinBaseurl || 'https://aime.bytedance.net/api/agents/v2/llmproxy/app',
-      validate: (input) => {
-        if (!input.trim()) return 'Endpoint URL is required';
-        try {
-          new URL(input);
-          return true;
-        } catch {
-          return 'Please enter a valid URL';
-        }
-      },
-    },
-  ]);
-
-  const { codinToken } = await inquirer.prompt([
-    {
-      type: 'password',
-      name: 'codinToken',
-      message: '🔑 Enter codin auth token:',
-      default: workConfig.codinToken || '',
-      validate: (input) => input.trim() ? true : 'Token is required',
-    },
-  ]);
-
-  setConfig({
-    channel: 'codin',
-    codinModel: finalCodinModel,
-    codinBaseurl,
-    codinToken,
   });
 
   return true;
@@ -511,10 +360,13 @@ export async function runSessionConfigFlow() {
       choices: [
         { name: `Personal ${chalk.gray('(session only)')}`, value: 'personal' },
         { name: `Work ${chalk.gray('(session only)')}`, value: 'work' },
+        { name: BACK_OPTION, value: 'back' },
       ],
       default: getMode(),
     },
   ]);
+
+  if (mode === 'back') return null;
 
   setConfig({ mode });
 
@@ -526,25 +378,19 @@ export async function runSessionConfigFlow() {
         message: '🌐 Choose your provider:',
         choices: [
           { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
-          { name: `coco ${chalk.gray('(Bytedance)')}`, value: 'coco' },
-          { name: `codin ${chalk.gray('(Bytedance)')}`, value: 'codin' },
+          { name: `aiden ${chalk.gray('(Bytedance)')}`, value: 'aiden' },
+          { name: `ttadk ${chalk.gray('(Bytedance)')}`, value: 'ttadk' },
+          { name: BACK_OPTION, value: 'back' },
         ],
         default: workConfig.channel || 'newapi',
       },
     ]);
 
-    if (channel === 'coco') {
-      const status = await checkAndShowCocoStatus();
-      if (!status.canProceed) return null;
-      setConfig({ mode: 'work', channel: 'coco' });
-      return { mode: 'work', channel: 'coco' };
-    }
+    if (channel === 'back') return null;
 
-    if (channel === 'codin') {
-      const status = await checkAndShowCodinStatus();
-      if (!status.canProceed) return null;
-      setConfig({ mode: 'work', channel: 'codin' });
-      return { mode: 'work', channel: 'codin' };
+    if (channel === 'aiden' || channel === 'ttadk') {
+      setConfig({ mode: 'work', channel });
+      return { mode: 'work', channel };
     }
 
     const { baseurl } = await inquirer.prompt([
@@ -598,10 +444,13 @@ export async function runSessionConfigFlow() {
         { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
         { name: `Kimi Coding Plan`, value: 'kimi' },
         { name: `Google Vertex AI ${chalk.gray('(GCP)')}`, value: 'vertex' },
+        { name: BACK_OPTION, value: 'back' },
       ],
       default: personalConfig.channel || 'newapi',
     },
   ]);
+
+  if (channel === 'back') return null;
 
   if (channel === 'vertex') {
     if (!isGcloudInstalled()) {

@@ -8,14 +8,9 @@ import axios from 'axios';
 import { runSessionConfigFlow } from './config-flow.js';
 import { showLaunchInfo, showStatus } from './banner.js';
 import { checkForUpdate, performUpdate } from './update.js';
-import {
-  startProxySidecar,
-  stopProxySidecar,
-  probeProxyAuth,
-  startTrafficLoggerProxy,
-} from './proxy.js';
 
-const GLOBAL_SETTINGS_PATH = join(homedir(), '.claude', 'settings.drizzle.json');
+const DRIZZLE_SETTINGS_PATH = join(homedir(), '.claude', 'settings.drizzle.json');
+const GLOBAL_SETTINGS_PATH = join(homedir(), '.claude', 'settings.json');
 const SESSION_SETTINGS_DIR = join(homedir(), '.claude', 'sessions', 'cc-launcher');
 
 // 需要清理的渠道相关环境变量
@@ -34,6 +29,7 @@ const CHANNEL_ENV_VARS = [
 function clearChannelEnv(settings) {
   if (!settings.env) return;
   CHANNEL_ENV_VARS.forEach(v => delete settings.env[v]);
+  delete settings.env.CC_LAUNCHER_PROXY_AUTH_HEADER;
 }
 
 /**
@@ -57,16 +53,61 @@ async function checkProxyHealth(proxyUrl) {
   }
 }
 
-function readSettings() {
-  if (!existsSync(GLOBAL_SETTINGS_PATH)) {
+function readDrizzleSettings() {
+  if (!existsSync(DRIZZLE_SETTINGS_PATH)) {
     return { env: {}, permissions: { allow: [] } };
+  }
+  try {
+    const content = readFileSync(DRIZZLE_SETTINGS_PATH, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return { env: {}, permissions: { allow: [] } };
+  }
+}
+
+function readGlobalSettings() {
+  if (!existsSync(GLOBAL_SETTINGS_PATH)) {
+    return {};
   }
   try {
     const content = readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8');
     return JSON.parse(content);
   } catch {
-    return { env: {}, permissions: { allow: [] } };
+    return {};
   }
+}
+
+function mergeSettings(global, drizzle) {
+  const merged = { ...global };
+  if (drizzle.env) {
+    merged.env = { ...global.env, ...drizzle.env };
+  }
+  return merged;
+}
+
+function filterCompanyHooks(settings) {
+  if (!settings.hooks) return settings;
+
+  const hasTeaAppId = (cmd) => typeof cmd === 'string' && cmd.includes('TEA_APP_ID=762748');
+
+  const filtered = {};
+  for (const [key, entries] of Object.entries(settings.hooks)) {
+    if (!Array.isArray(entries)) {
+      filtered[key] = entries;
+      continue;
+    }
+
+    const newEntries = entries.map((entry) => {
+      if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
+      const newHooks = entry.hooks.filter((h) => !hasTeaAppId(h.command));
+      if (newHooks.length === 0) return null;
+      return { ...entry, hooks: newHooks };
+    }).filter(Boolean);
+
+    filtered[key] = newEntries;
+  }
+
+  return { ...settings, hooks: filtered };
 }
 
 function createSessionSettingsFile(settings) {
@@ -125,40 +166,6 @@ function updateSettingsForKimi(settings, { kimiApikey, selectedModel }) {
   return settings;
 }
 
-function updateSettingsForCoco(settings, sidecar) {
-  if (!settings.env) {
-    settings.env = {};
-  }
-  clearChannelEnv(settings);
-
-  settings.env.ANTHROPIC_BASE_URL = sidecar.baseUrl;
-  settings.env.ANTHROPIC_AUTH_TOKEN = sidecar.authToken || '';
-  if (typeof sidecar?.close === 'function') {
-    settings.env.ANTHROPIC_MODEL = 'seeddance2.0';
-  } else {
-    delete settings.env.ANTHROPIC_MODEL;
-  }
-  settings.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  return settings;
-}
-
-function updateSettingsForCodin(settings, sidecar) {
-  if (!settings.env) {
-    settings.env = {};
-  }
-  clearChannelEnv(settings);
-
-  settings.env.ANTHROPIC_BASE_URL = sidecar.baseUrl;
-  settings.env.ANTHROPIC_AUTH_TOKEN = sidecar.authToken || '';
-  if (typeof sidecar?.close === 'function') {
-    settings.env.ANTHROPIC_MODEL = 'seeddream2.0';
-  } else {
-    delete settings.env.ANTHROPIC_MODEL;
-  }
-  settings.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  return settings;
-}
-
 async function selectLaunchMode() {
   const { launchMode } = await inquirer.prompt([
     {
@@ -169,15 +176,34 @@ async function selectLaunchMode() {
         { name: '1) 手动驾驶（claude）', value: 'manual' },
         { name: '2) 辅助驾驶（claude --permission-mode acceptEdits）', value: 'assist' },
         { name: '3) 自动驾驶（claude --permission-mode auto）', value: 'auto' },
+        { name: '← Back', value: 'back' },
       ],
       default: 'manual',
     },
   ]);
 
+  if (launchMode === 'back') {
+    process.exit(0);
+  }
+
   return launchMode;
 }
 
-function buildClaudeArgs(sessionSettingsPath, launchMode) {
+function buildLaunchCommand(sessionSettingsPath, launchMode, channel, config) {
+  if (channel === 'aiden') {
+    return {
+      command: 'aiden',
+      args: ['x', 'claude'],
+    };
+  }
+
+  if (channel === 'ttadk') {
+    return {
+      command: 'ttadk',
+      args: ['code', '-t', 'claude'],
+    };
+  }
+
   const args = [];
   if (launchMode === 'assist') {
     args.push('--permission-mode', 'acceptEdits');
@@ -185,7 +211,11 @@ function buildClaudeArgs(sessionSettingsPath, launchMode) {
     args.push('--permission-mode', 'auto');
   }
   args.push('--settings', sessionSettingsPath);
-  return args;
+
+  return {
+    command: 'claude',
+    args,
+  };
 }
 
 export async function launchClaude() {
@@ -223,10 +253,8 @@ export async function launchClaude() {
     process.exit(1);
   }
 
-  const channel = config.channel;
+  let channel = config.channel;
   const currentMode = config.mode;
-  let sidecar = null;
-  let proxyLogger = null;
 
   // Vertex 代理健康检查
   if (channel === 'vertex' && config.proxyUrl) {
@@ -244,73 +272,41 @@ export async function launchClaude() {
     showStatus('Proxy connection OK', 'success');
   }
 
-  if (channel === 'coco' || channel === 'codin') {
-    showStatus(`Starting ${channel} proxy sidecar...`, 'loading');
-    try {
-      sidecar = await startProxySidecar(channel);
-      showStatus(`${channel} proxy is running`, 'success');
+  const shouldSkipLaunchMode = channel === 'aiden' || channel === 'ttadk';
+  const launchMode = shouldSkipLaunchMode ? 'manual' : await selectLaunchMode();
 
-      showStatus('Probing proxy auth...', 'loading');
-      const probe = await probeProxyAuth(sidecar.baseUrl, sidecar.authToken);
-      if (!probe.ok) {
-        console.log();
-        showStatus(
-          `Proxy auth probe failed (status ${probe.status}). Response: ${probe.bodyPreview || 'empty'}`,
-          'error',
-        );
-        process.exit(1);
-      }
+  // Show launch info
+  showLaunchInfo(currentMode, channel, config);
 
-      showStatus(`Proxy auth OK (${probe.status})`, 'success');
-
-      if (process.env.CC_LAUNCHER_PROXY_LOG === '1') {
-        proxyLogger = await startTrafficLoggerProxy(sidecar.baseUrl, sidecar.authToken, probe.headers);
-        showStatus(`Proxy traffic logger enabled at ${proxyLogger.baseUrl}`, 'success');
-      }
-    } catch (error) {
-      console.log();
-      showStatus(`Failed to start ${channel} proxy: ${error.message}`, 'error');
-      process.exit(1);
-    }
-  }
-
-  // Update settings.drizzle.json
+  // Merge global + drizzle settings
   showStatus('Updating Claude settings...', 'saving');
 
-  const settings = readSettings();
+  const globalSettings = readGlobalSettings();
+  const drizzleSettings = readDrizzleSettings();
+  let settings = mergeSettings(globalSettings, drizzleSettings);
 
   if (channel === 'vertex') {
     updateSettingsForVertex(settings, config);
   } else if (channel === 'kimi') {
     updateSettingsForKimi(settings, config);
-  } else if (channel === 'coco') {
-    updateSettingsForCoco(settings, {
-      ...sidecar,
-      baseUrl: proxyLogger?.baseUrl || sidecar.baseUrl,
-    });
-  } else if (channel === 'codin') {
-    updateSettingsForCodin(settings, {
-      ...sidecar,
-      baseUrl: proxyLogger?.baseUrl || sidecar.baseUrl,
-    });
   } else {
     updateSettingsForNewApi(settings, { ...config, mode: currentMode });
   }
 
+  if (currentMode === 'personal') {
+    settings = filterCompanyHooks(settings);
+  }
+
   const sessionSettingsPath = createSessionSettingsFile(settings);
 
-  // Show launch info
-  showLaunchInfo(currentMode, channel, config);
+  const launchCommand = buildLaunchCommand(sessionSettingsPath, launchMode, channel, config);
 
-  const launchMode = await selectLaunchMode();
-  const claudeArgs = buildClaudeArgs(sessionSettingsPath, launchMode);
-
-  // Launch claude
+  // Launch cli
   showStatus('Starting Claude Code...', 'launching');
   console.log();
 
   try {
-    await execa('claude', claudeArgs, {
+    await execa(launchCommand.command, launchCommand.args, {
       stdio: 'inherit',
       preferLocal: false,
     });
@@ -324,13 +320,6 @@ export async function launchClaude() {
     if (error.exitCode !== undefined && error.exitCode !== 0) {
       console.log();
       showStatus(`Claude exited with code ${error.exitCode}`, 'warning');
-    }
-  } finally {
-    if (proxyLogger) {
-      await proxyLogger.close();
-    }
-    if (sidecar) {
-      await stopProxySidecar(sidecar);
     }
   }
 }

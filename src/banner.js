@@ -66,12 +66,6 @@ export function showLaunchInfo(mode, channel, config) {
     console.log(chalk.white('  🌐 Channel:   ') + chalk.green('Kimi Coding Plan'));
     console.log(chalk.white('  🔗 Endpoint:  ') + chalk.green('https://api.kimi.com/coding/'));
     console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.selectedModel));
-  } else if (channel === 'coco') {
-    console.log(chalk.white('  🌐 Channel:   ') + chalk.green('coco (Bytedance)'));
-    console.log(chalk.white('  🔀 Route:     ') + chalk.green('via coco sidecar proxy'));
-  } else if (channel === 'codin') {
-    console.log(chalk.white('  🌐 Channel:   ') + chalk.green('codin (Bytedance)'));
-    console.log(chalk.white('  🔀 Route:     ') + chalk.green('via codin sidecar proxy'));
   } else {
     console.log(chalk.white('  🌐 Channel:   ') + chalk.green('NewAPI'));
     console.log(chalk.white('  🔗 Endpoint:  ') + chalk.green(config.baseurl));
@@ -166,28 +160,18 @@ export function showConfigStatus(config) {
   if (config.mode === 'work') {
     const channelDisplay = {
       'newapi': 'NewAPI',
-      'coco': 'coco (Bytedance)',
-      'codin': 'codin (Bytedance)',
     };
     const channel = config.channel || 'newapi';
     console.log(chalk.white('  🌐 Channel:   ') + chalk.green(channelDisplay[channel] || channel));
 
-    if (channel === 'coco') {
-      console.log(chalk.white('  🔀 Route:     ') + chalk.green('via coco sidecar proxy'));
-    } else if (channel === 'codin') {
-      console.log(chalk.white('  🔀 Route:     ') + chalk.green('via codin sidecar proxy'));
-    } else {
-      console.log(chalk.white('  🔗 Endpoint:  ') + chalk.green(config.baseurl || chalk.gray('(not set)')));
-      console.log(chalk.white('  🔑 API Key:   ') + maskSensitive(config.apikey));
-      console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.selectedModel || chalk.gray('(not set)')));
-    }
+    console.log(chalk.white('  🔗 Endpoint:  ') + chalk.green(config.baseurl || chalk.gray('(not set)')));
+    console.log(chalk.white('  🔑 API Key:   ') + maskSensitive(config.apikey));
+    console.log(chalk.white('  🤖 Model:     ') + chalk.green(config.selectedModel || chalk.gray('(not set)')));
   } else {
     const channelDisplay = {
       'newapi': 'NewAPI',
       'kimi': 'Kimi Coding Plan',
       'vertex': 'Vertex AI (Gemini)',
-      'coco': 'coco (Bytedance)',
-      'codin': 'codin (Bytedance)',
     };
     console.log(chalk.white('  🌐 Channel:   ') + chalk.green(channelDisplay[config.channel] || config.channel));
 

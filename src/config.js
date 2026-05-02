@@ -61,10 +61,6 @@ export function getConfig() {
       baseurl: work.baseurl,
       apikey: work.apikey,
       selectedModel: work.selectedModel,
-      cocoModel: work.cocoModel,
-      codinModel: work.codinModel,
-      codinBaseurl: work.codinBaseurl,
-      codinToken: work.codinToken,
     };
   } else {
     const personal = getPersonalConfig();
@@ -112,10 +108,6 @@ export function setConfig(data) {
     if (data.baseurl !== undefined) work.baseurl = data.baseurl;
     if (data.apikey !== undefined) work.apikey = data.apikey;
     if (data.selectedModel !== undefined) work.selectedModel = data.selectedModel;
-    if (data.cocoModel !== undefined) work.cocoModel = data.cocoModel;
-    if (data.codinModel !== undefined) work.codinModel = data.codinModel;
-    if (data.codinBaseurl !== undefined) work.codinBaseurl = data.codinBaseurl;
-    if (data.codinToken !== undefined) work.codinToken = data.codinToken;
     config.set('work', work);
   } else {
     const personal = getPersonalConfig();
@@ -146,7 +138,7 @@ export function hasWorkConfig() {
   const work = getWorkConfig();
   const channel = work.channel || 'newapi';
 
-  if (channel === 'coco' || channel === 'codin') {
+  if (channel === 'aiden' || channel === 'ttadk') {
     return true;
   } else {
     return !!(work.baseurl && work.apikey && work.selectedModel);
