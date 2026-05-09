@@ -85,31 +85,6 @@ function mergeSettings(global, drizzle) {
   return merged;
 }
 
-function filterCompanyHooks(settings) {
-  if (!settings.hooks) return settings;
-
-  const hasTeaAppId = (cmd) => typeof cmd === 'string' && cmd.includes('TEA_APP_ID=762748');
-
-  const filtered = {};
-  for (const [key, entries] of Object.entries(settings.hooks)) {
-    if (!Array.isArray(entries)) {
-      filtered[key] = entries;
-      continue;
-    }
-
-    const newEntries = entries.map((entry) => {
-      if (!entry.hooks || !Array.isArray(entry.hooks)) return entry;
-      const newHooks = entry.hooks.filter((h) => !hasTeaAppId(h.command));
-      if (newHooks.length === 0) return null;
-      return { ...entry, hooks: newHooks };
-    }).filter(Boolean);
-
-    filtered[key] = newEntries;
-  }
-
-  return { ...settings, hooks: filtered };
-}
-
 function createSessionSettingsFile(settings) {
   mkdirSync(SESSION_SETTINGS_DIR, { recursive: true });
   const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -190,20 +165,6 @@ async function selectLaunchMode() {
 }
 
 function buildLaunchCommand(sessionSettingsPath, launchMode, channel, config) {
-  if (channel === 'aiden') {
-    return {
-      command: 'aiden',
-      args: ['x', 'claude'],
-    };
-  }
-
-  if (channel === 'ttadk') {
-    return {
-      command: 'ttadk',
-      args: ['code', '-t', 'claude'],
-    };
-  }
-
   const args = [];
   if (launchMode === 'assist') {
     args.push('--permission-mode', 'acceptEdits');
@@ -272,8 +233,7 @@ export async function launchClaude() {
     showStatus('Proxy connection OK', 'success');
   }
 
-  const shouldSkipLaunchMode = channel === 'aiden' || channel === 'ttadk';
-  const launchMode = shouldSkipLaunchMode ? 'manual' : await selectLaunchMode();
+  const launchMode = await selectLaunchMode();
 
   // Show launch info
   showLaunchInfo(currentMode, channel, config);
@@ -291,10 +251,6 @@ export async function launchClaude() {
     updateSettingsForKimi(settings, config);
   } else {
     updateSettingsForNewApi(settings, { ...config, mode: currentMode });
-  }
-
-  if (currentMode === 'personal') {
-    settings = filterCompanyHooks(settings);
   }
 
   const sessionSettingsPath = createSessionSettingsFile(settings);

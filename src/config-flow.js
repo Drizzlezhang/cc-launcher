@@ -71,8 +71,6 @@ async function runWorkConfig() {
       message: '🌐 Choose your provider:',
       choices: [
         { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
-        { name: `aiden ${chalk.gray('(Bytedance)')}`, value: 'aiden' },
-        { name: `ttadk ${chalk.gray('(Bytedance)')}`, value: 'ttadk' },
         { name: BACK_OPTION, value: 'back' },
       ],
       default: workConfig.channel || 'newapi',
@@ -82,14 +80,6 @@ async function runWorkConfig() {
   if (channel === 'back') return false;
 
   console.log();
-
-  // 根据渠道调用不同的配置函数
-  if (channel === 'aiden' || channel === 'ttadk') {
-    setConfig({
-      channel,
-    });
-    return true;
-  }
 
   // NewAPI 渠道（原有逻辑）
   const { baseurl } = await inquirer.prompt([
@@ -378,8 +368,6 @@ export async function runSessionConfigFlow() {
         message: '🌐 Choose your provider:',
         choices: [
           { name: `NewAPI ${chalk.gray('(OpenAI-compatible)')}`, value: 'newapi' },
-          { name: `aiden ${chalk.gray('(Bytedance)')}`, value: 'aiden' },
-          { name: `ttadk ${chalk.gray('(Bytedance)')}`, value: 'ttadk' },
           { name: BACK_OPTION, value: 'back' },
         ],
         default: workConfig.channel || 'newapi',
@@ -387,11 +375,6 @@ export async function runSessionConfigFlow() {
     ]);
 
     if (channel === 'back') return null;
-
-    if (channel === 'aiden' || channel === 'ttadk') {
-      setConfig({ mode: 'work', channel });
-      return { mode: 'work', channel };
-    }
 
     const { baseurl } = await inquirer.prompt([
       {

@@ -136,13 +136,8 @@ export function clearConfig() {
  */
 export function hasWorkConfig() {
   const work = getWorkConfig();
-  const channel = work.channel || 'newapi';
 
-  if (channel === 'aiden' || channel === 'ttadk') {
-    return true;
-  } else {
-    return !!(work.baseurl && work.apikey && work.selectedModel);
-  }
+  return !!(work.baseurl && work.apikey && work.selectedModel);
 }
 
 /**
